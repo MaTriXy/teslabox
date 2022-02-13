@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <title>TeslaBox Streams</title>
+  </head>
+  <body class="container mt-3">
+    <a href="/" class="btn btn-secondary btn-sm">Back</a>
+    <a href="/stream" class="btn btn-secondary btn-sm"><i class="bi-arrow-repeat"></i></a>
+
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th scope="col">
+            <span id="front"></span>
+            <span id="back"></span>
+            <span id="left"></span>
+            <span id="right"></span>
+          </th>
+        </tr>
+      </thead>
+
+      <caption id="maxDate"></caption>
+      <tbody>
+        <tr>
+          <td>
+            <video width="100%" controls autoplay>
+              <source type="video/mp4">
+            </video>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+    <script>
+      const media = document.querySelector('video')
+      const source = document.querySelector('source')
+
+      const interval = 5000
+      const dates = {}
+      let maxDate = 0
+      let lastPlay = []
+
+      media.addEventListener('ended', (event) => {
+        if (dates[lastPlay[0]] > lastPlay[1]) {
+          play(lastPlay[0], dates[lastPlay[0]])
+        }
+      })
+
+      function play(angle, date) {
+        lastPlay = [angle, date]
+        source.src = `/ram/stream/out/${angle}.mp4?${date}`
+        media.load()
+      }
+
+
+      function playlist() {
+        fetch('/stream?json')
+        .then(res => res.json())
+        .then(out => {
+          for (const angle of ['front', 'back', 'left', 'right']) {
+            if (out[angle]) {
+              dates[angle] = out[angle]
+              maxDate = Math.max(maxDate, dates[angle])
+              if (!lastPlay.length) {
+                play(angle, dates[angle])
+              }
+
+              const caret = angle === 'front' ? 'up' : angle === 'back' ? 'down' : angle
+              const label = angle.charAt(0).toUpperCase() + angle.slice(1)
+              document.getElementById(angle).innerHTML = `<a href="#" onclick="play('${angle}', ${dates[angle]})"><i class="bi-caret-${caret}-fill"></i></a> <a href="#" onclick="play('${angle}', ${dates[angle]})">${label}</a>`
+            }
+          }
+
+          if (maxDate) {
+            const dt = new Date(maxDate)
+            document.getElementById('maxDate').innerHTML = `Updated: ${new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().substr(0, 19).replace('T', ' ')}`
+          }
+        })
+        .catch(err => console.log(err))
+      }
+
+      playlist()
+      setInterval(playlist, interval)
+    </script>
+  </body>
+</html>

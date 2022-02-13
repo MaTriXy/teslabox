@@ -3,12 +3,15 @@ Lite, open-source version of [teslarpi.com](https://www.teslarpi.com).
 
 Compresses Tesla dashcam and sentry clips, uploads to S3, notifies of events (along with a copy of each clip) via Telegram and allows remote streaming while parked or driving!
 
+![](https://cdn.teslarpi.com/assets/img/teslabox.gif)
+
 ## Prerequisites
-- Raspberry Pi 4 with at least 4GB of ram, case and fan
-- Micro-SD card with at least 64GB of storage and reader
+- Raspberry Pi 4 with at least 4GB of ram with case and fan
+- Micro-SD card with at least 64GB of storage and card reader
 - USB-A to USB-C or USB-C to USB-C (all males) cable
+- Some form of WiFi access (preferably in-car)
 - [AWS account](https://aws.amazon.com/)
-- [Ngrok account](https://ngrok.com/) (free, or paid - for custom/static subdomains)
+- [Ngrok account](https://ngrok.com/) (preferably paid)
 - [Telegram account](https://telegram.org/)
 
 ## Installation
@@ -16,7 +19,7 @@ For paid (priority) support please contact teslabox@payymail.com
 
 ### AWS (required for archiving)
 1. Sign into your AWS account
-2. Create a new S3 bucket as follows:
+2. Create a new S3 bucket:
    - Bucket name: however you'd like (must be globally unique)
    - AWS region: either us-east-1 or the one closest to you
    - ACL Disabled
@@ -24,39 +27,43 @@ For paid (priority) support please contact teslabox@payymail.com
    - Bucket versioning: Disable
    - Default encryption: Disable
    - Click "Create Bucket"
-3. Create a new IAM user as follows:
-   - User name: whatever you'd like
+3. Add a new IAM user:
+   - User name: whatever you'd like (i.e teslabox)
    - Select AWS credential type: Access key: - Programmatic access
    - Click "Next: Permissions"
-   - Click "Create Policy"
+   - Under "Attach existing policies directly" click "Create Policy"
    - Service: S3
    - Actions: PutObject
-   - Resource: Add ARN to restrict access and put your Bucket name from 2.1. and Object name any
+   - Resource: Add ARN to restrict access
+   - Enter your Bucket name from 2.1. and Object name any
+   - Click "Add"
    - Click "Next: Tags"
    - Click "Next: Review"
-   - Name: "TeslaBox"
+   - Name: "teslabox"
    - Click "Create Policy"
-   - Back on the IAM user page, refresh the list of policies and check "TeslaBox"
+   - Back on the IAM user page, refresh the list of policies and check "teslabox"
    - Click "Next: Tags"
    - Click "Next: Review"
    - Click "Create User"
    - Copy both the Access key ID and Secret access key
+4. Note, depending on your S3 usage [you will be charged](https://aws.amazon.com/s3/pricing/) for each clip stored and/or downloaded
 
 ### Ngrok (required for remote access)
 1. Sign into your Ngrok account
-2. Retrieve your secret auth token
+2. Retrieve your secret token under *Getting Started > Your Authtoken*
+3. Note, going with a paid plan would simplify remote access with custom subdomains
 
 ### Telegram (required for notifications)
 1. Sign into your Telegram account
-2. Search and contact @Botfather user
+2. Search and contact [@Botfather](https://telegram.me/BotFather) user
 3. Enter /newbot and follow the wizard to create a new bot and retrieve your secret HTTP API token
 4. Contact the new bot you just created and click "Start"
-5. Search and contact @get_id_bot user
+5. Search and contact [@get_id_bot](https://telegram.me/get_id_bot) user
 6. Enter anything to retrieve your Chat ID
 
 ### Raspberry Pi
 1. Download and run [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
-2. Install the Lite (32-bit) version to your Micro-SD card
+2. Write the 32 or 64-bit *Lite* version to your Micro-SD card
 3. Re-insert the Micro-SD card and perform the following:
    3.1. Add this to the bottom of **config.txt**:
    ```
@@ -70,44 +77,44 @@ For paid (priority) support please contact teslabox@payymail.com
    modules-load=dwc2
    ```
 
-   3.3. Add an empty **ssh** file
+   3.3. Add an empty **ssh** file (without file extension)
 
-   3.4. Add **wpa_supplicant.conf** file listing one or more WiFi networks with increasing priority. If I want TeslaBox to prefer my home network, then my USB access point, then my mobile hotspot.
+   3.4. Add **wpa_supplicant.conf** file, change your country and list one or more WiFi networks with increasing priority. If I want TeslaBox to prefer my home network, then my USB access point, then my mobile hotspot:
    ```
    ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
    country=US
    update_config=1
 
    network={
-     ssid="my_home_wifi_ssid"
+     ssid="my_home_wifi_name"
      psk="my_home_wifi_password"
      priority=3
      id_str="home"
    }
 
    network={
-     ssid="my_usb_wifi_ssid"
-     psk="my_usb_wifi_password"
+     ssid="my_usb_ap_wifi_name"
+     psk="my_usb_ap_wifi_password"
      priority=2
      id_str="ap"
    }
 
    network={
-     ssid="my_hotspot_wifi_ssid"
+     ssid="my_hotspot_wifi_name"
      psk="my_hotspot_wifi_password"
      priority=1
      id_str="hotspot"
    }
    ```
-4. Eject the Micro-SD card, insert to your Raspberry Pi and power it up
+4. Safely eject the Micro-SD card, insert to your Raspberry Pi and boot it up
 5. SSH to your Raspberry Pi:
-   - IP should be listed on your Router under DHCP table
+   - IP should be listed on your Router's DHCP client table
    - Username is ```pi```
    - Default password is ```raspberry```
-6. Change the default password using **passwd** command
+6. Change the default password using ```passwd``` command
 7. Perform the following as sudo using ```sudo -i```
 
-   7.1. Allocation of USB storage:
+   7.1. Allocate USB storage:
    ```
    size="$(($(df --output=avail / | tail -1) - 12000000))"
    fallocate -l "$size"K /usb.bin
@@ -117,13 +124,14 @@ For paid (priority) support please contact teslabox@payymail.com
 
    touch /etc/modprobe.d/g_mass_storage.conf
    echo "options g_mass_storage file=/usb.bin removable=1 ro=0 stall=0 iSerialNumber=123456" >> /etc/modprobe.d/g_mass_storage.conf
+   mkdir -p /mnt/usb/TeslaCam
    ```
    * 12000000 is 120GB (~93%) of 128GB card (we want around 8GB of unallocated space)
    * Decrease 12000000 to 5600000 for 64GB card
    * Increase 12000000 to 24800000 for 256GB card
    * Increase 12000000 to 50400000 for 512GB card
 
-   7.2. Allocation of RAM disk:
+   7.2. Allocate RAM disk:
    ```
    mkdir /mnt/ram
    echo "tmpfs /mnt/ram tmpfs nodev,nosuid,size=4G 0 0" >> /etc/fstab
@@ -133,14 +141,15 @@ For paid (priority) support please contact teslabox@payymail.com
    * Decrease 4GB to 1GB if you have a board with 2GB of ram
 
    7.3. Run **raspi-config** to set:
-   * Variable fan speed (under "Performance") if you have a 3-wire fan
+   * Variable fan speed (under "Performance") if you have a 3-wires fan
    * Your timezone (under "Localization")
+   * Exit without restarting
 
-   7.4. Update system packages, upgrade and install additional software:
+   7.4. Update system packages, upgrade and install required software:
    ```
    curl -fsSL https://deb.nodesource.com/setup_14.x | sudo -E bash -
    apt update && apt upgrade -y
-   apt install -y nodejs ffmpeg fonts-freefont-ttf python3-pip
+   apt install -y nodejs python3-pip ffmpeg fonts-freefont-ttf
    pip install tesla_dashcam
    ```
 
@@ -154,14 +163,14 @@ For paid (priority) support please contact teslabox@payymail.com
    npm install
    ```
 
-   7.6. Add this after exit of **/etc/rc.local**:
+   7.6. Add this just before "exit 0" in **/etc/rc.local**:
    ```
-   /usr/sbin/modprobe g_mass_storage & >> /var/log/app.log 2>&1
-   /usr/sbin/fsck -a -y /mnt/usb >> /var/log/app.log 2>&1
-   mount /mnt/usb & >> /var/log/app.log 2>&1
+   /usr/sbin/modprobe g_mass_storage & >> /var/log/teslabox.log 2>&1
+   /usr/sbin/fsck -a -y /mnt/usb >> /var/log/teslabox.log 2>&1
+   mount /mnt/usb & >> /var/log/teslabox.log 2>&1
    ```
 
-   7.7. Create and edit service variables for this file **/lib/systemd/system/app.service**:
+   7.7. Create and edit service variables in **/lib/systemd/system/teslabox.service**:
    ```
    [Unit]
    Description=App
@@ -184,10 +193,6 @@ For paid (priority) support please contact teslabox@payymail.com
    # Choose the region closest to you (us, eu, ap, au, sa, jp or in)
    Environment="NGROK_REGION=us"
 
-   # For paid Ngrok accounts, enter your custom admin and/or public subdomains
-   Environment="ADMIN_HOST="
-   Environment="PUBLIC_HOST="
-
    # To enable remote admin access, enter username and password
    Environment="ADMIN_USER="
    Environment="ADMIN_PASSWORD="
@@ -195,6 +200,10 @@ For paid (priority) support please contact teslabox@payymail.com
    # To enable remote public (stream-only) access, enter username and password
    Environment="PUBLIC_USER="
    Environment="PUBLIC_PASSWORD="
+
+   # For paid Ngrok accounts, enter your custom admin and/or public subdomains
+   Environment="ADMIN_HOST="
+   Environment="PUBLIC_HOST="
 
    Type=simple
    User=root
@@ -209,28 +218,33 @@ For paid (priority) support please contact teslabox@payymail.com
    7.8. Install the service to start at every boot:
    ```
    systemctl daemon-reload
-   systemctl enable app
-   systemctl start app
-   systemctl status app
+   systemctl enable teslabox
+   systemctl start teslabox
+   systemctl status teslabox
    ```
-   If the status is Green and shows RUNNING, continue to setup
+   If the status is Green and shows active (running), continue to setup
 
 ## Setup
 
-### Local connectivity
-For the initial setup, it is best to connect TeslaBox to your home network via ethernet cable or home WiFi, then browse to your device IP address
+### Initial setup
+Connect TeslaBox to your home network via ethernet cable or home WiFi, browse your device IP address and edit these settings:
+
+- Car name (appears next to each notification)
+- Log level (log verbosity. recommended: Debug)
+- Archive (enables archiving)
+- Archive seconds (the longer you set this, the more time and space each clip would take to process. recommended: 30)
+- Archive quality (the higher you set this, the more space each clip would take. recommended: Lower)
+- Archive compression (the slower you set this, the less space each clip would take, but also the longer it take to process. recommended: Super fast)
+- Telegram recipients (comma seperated list of chat IDs that should be notified. recommended: your Telegram Chat ID)
+- Stream (enables streaming)
+- SSH (enables remote shell access)
+- Public (enables remote public streaming)
 
 ### In-car connectivity
-TeslaBox works best with in-car WiFi. I personally use a 4G USB access point plugged into the main console with a short USB-A (female) to USB-C (male) cable. You can also use your WiFi hotspot, or wait for the car to use your home WiFi while you park.
+TeslaBox works best with in-car WiFi. I personally use a 4G USB access point plugged into the main console with a short USB-A (female) to USB-C (male) cable. You can also use your mobile WiFi hotspot, or wait for the car to use your home WiFi as you park.
 
 ### Admin access
-This works if you entered admin user and password. Most settings are self-explanatory, so I'll focus on the important ones:
-
-- Archive would merge videos of the selected number of seconds into a single clip and upload to S3
-- Telegram receipient (your Chat ID) enables notifications from your Telegram created bot
-- Stream would show 1-minute delay videos from all angles
-- SSH would enable remote SSH access (assuming you also enabled Telegram notifications)
-- Public would enable remote public access to stream (assuming you also entered public user and password)
+This works if you entered admin user and password. Settings are explained above under Initial setup.
 
 ### Public access
 This works if you entered public user and password. It will restrict public access to stream view only.
@@ -261,4 +275,9 @@ If sentry mode is disabled or car is asleep, you might not see any new streams.
 This feature is automatically disabled when the car goes to sleep or TeslaBox restarts.
 
 ## Support
-Please open an issue if things seems out of order. Paid (priority) support is available at teslabox@payymail.com
+TeslaBox is not affiliated or supported by Tesla. There is no official support whatsoever. As per the license this is provided As-Is. **Use at your own risk!**
+
+Please open an issue if things seems out of order and I'll attend them as time allows.
+
+## Credits
+TeslaBox wouldn't become available without the help of [teslausb](https://github.com/marcone/teslausb), [tesla_dashcam](https://github.com/ehendrix23/tesla_dashcam) and good friends at [Tesla Fans Israel Telegram Group](https://t.me/TeslaFansIL).

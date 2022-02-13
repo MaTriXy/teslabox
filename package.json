@@ -1,0 +1,40 @@
+{
+  "name": "teslabox",
+  "description": "teslabox",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "development": "nodemon src/index.js",
+    "test": "echo \"TEST OK\""
+  },
+  "dependencies": {
+    "async": "^3.2.2",
+    "aws-sdk": "^2.1046.0",
+    "compression": "^1.7.4",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "glob": "^7.2.0",
+    "hjs": "0.0.6",
+    "lodash": "^4.17.21",
+    "messaging-api-telegram": "^1.1.0",
+    "ngrok": "^4.2.2",
+    "ping": "^0.4.1",
+    "promise-to-callback": "^1.0.0",
+    "serve-favicon": "^2.5.0",
+    "simple-json-db": "^1.2.3"
+  },
+  "devDependencies": {},
+  "standard": {
+    "ignore": [
+      "node_modules/**"
+    ]
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "node_modules/**",
+      "config.json",
+      "mnt/**"
+    ]
+  }
+}
